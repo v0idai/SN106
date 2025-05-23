@@ -75,7 +75,7 @@ Refer to the [Minimum Compute YAML](./min_compute.yml) before deployment.
 ## Incentive Mechanism
 
 * **LP Emissions:** Distributed pro-rata based on validated LP stake.
-* **Trading Fees:** Raydium swap fees (0.25%) are used to buy back LP tokens.
+* **Trading Fees:** Raydium swap fees (0.25%) are used to buy back LP tokens and then redeployed as liquidity.
 * **Bridge & Staking Yields:** Routed to LP treasury and redeployed as liquidity.
 * **Validator Commissions:** Flow to treasury for future liquidity provisioning.
 
@@ -110,12 +110,6 @@ Refer to the [Minimum Compute YAML](./min_compute.yml) before deployment.
 2. Bridge assets to Solana.
 3. Redeploy as liquidity (e.g., wTAO/ALPHA).
 
-### Governance Model:
-
-* **Proposals:** Open to all LP token holders.
-* **Voting:** Weighted by token holdings.
-* **Transparency:** All decisions and flows are on-chain.
-
 ---
 
 ## Security
@@ -131,7 +125,7 @@ Refer to the [Minimum Compute YAML](./min_compute.yml) before deployment.
 * **Q3 2025:** Launch with wTAO/SOL & wTAO/USDC pools.
 * **Post Bridge v2:** Integrate wALPHA pools.
 * **Q1 2026:** Introduce dTAO governance and emission control.
-* **Q2 2026:** Launch LP SDK and real-time governance dashboards.
+* **Q2 2026:** Launch real-time governance dashboards.
 
 ---
 
