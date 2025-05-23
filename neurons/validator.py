@@ -37,9 +37,6 @@ class Validator(BaseValidatorNeuron):
     Inherits from BaseValidatorNeuron and implements validator-specific logic.
     """
     scores: Tensor
-    # @property
-    # def current_block(self):
-    #     return get_current_block(subtensor=self.subtensor)
     
     def __init__(self, config=None):
         super(Validator, self).__init__(config=config)
@@ -110,25 +107,21 @@ class Validator(BaseValidatorNeuron):
     async def start(self):
         """The Main Validation Loop"""
         self.loop = asyncio.get_running_loop()
-
-        block_next_pog = 1
-        block_next_sync_status = 1
-        block_next_set_weights = None  # Delay until sync
-        block_next_hardware_info = 1
-        block_next_miner_checking = 1
-
-        time_next_pog = None
-        time_next_sync_status = None
-        time_next_set_weights = None
-        time_next_hardware_info = None
+         # Initialize time trackers
+        last_burn_weights_time = 0  # epoch time in seconds
+        burn_weights_interval = 20 * 60  # 20 minutes in seconds
 
         bt.logging.info("Starting validator loop.")
         while True:
             try:
                 self.sync()
-                self.set_burn_weights()
+                
+                current_time = time.time()
+                if current_time - last_burn_weights_time >= burn_weights_interval:
+                    self.set_burn_weights()
+                    last_burn_weights_time = current_time
 
-                await asyncio.sleep(5)
+                await asyncio.sleep(1)
 
             except RuntimeError as e:
                 bt.logging.error(e)
