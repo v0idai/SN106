@@ -1,6 +1,5 @@
 # The MIT License (MIT)
 # Copyright © 2023 Yuma Rao
-# TODO(developer): Set your name
 # Copyright © 2023 <your name>
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
@@ -17,9 +16,8 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-
 import time
-
+import asyncio
 # Bittensor
 import bittensor as bt
 
@@ -28,24 +26,23 @@ from template.base.validator import BaseValidatorNeuron
 
 # Bittensor Validator Template:
 from template.validator import forward
+import torch
+from torch._C._te import Tensor  # type: ignore
+import string
 
 
 class Validator(BaseValidatorNeuron):
     """
-    Your validator neuron class. You should use this class to define your validator's behavior. In particular, you should replace the forward function with your own logic.
-
-    This class inherits from the BaseValidatorNeuron class, which in turn inherits from BaseNeuron. The BaseNeuron class takes care of routine tasks such as setting up wallet, subtensor, metagraph, logging directory, parsing config, etc. You can override any of the methods in BaseNeuron if you need to customize the behavior.
-
-    This class provides reasonable default behavior for a validator such as keeping a moving average of the scores of the miners and using them to set weights at the end of each epoch. Additionally, the scores are reset for new hotkeys at the end of each epoch.
+    Your validator neuron class.
+    Inherits from BaseValidatorNeuron and implements validator-specific logic.
     """
-
+    scores: Tensor
+    
     def __init__(self, config=None):
         super(Validator, self).__init__(config=config)
 
         bt.logging.info("load_state()")
         self.load_state()
-
-        # TODO(developer): Anything specific to your use case you can do here
 
     async def forward(self):
         """
@@ -56,13 +53,92 @@ class Validator(BaseValidatorNeuron):
         - Rewarding the miners
         - Updating the scores
         """
-        # TODO(developer): Rewrite this function based on your protocol definition.
         return await forward(self)
 
+    def get_burn_uid(self) -> int:
+        """
+        Returns the UID of the subnet owner (the burn account) for this subnet.
+        """
+        sn_owner_hotkey = self.subtensor.query_subtensor(
+            "SubnetOwnerHotkey",
+            params=[self.config.netuid],
+        )
+        bt.logging.info(f"Subnet Owner Hotkey: {sn_owner_hotkey}")
 
-# The main function parses the configuration and runs the validator.
-if __name__ == "__main__":
-    with Validator() as validator:
+        burn_uid = self.subtensor.get_uid_for_hotkey_on_subnet(
+            hotkey_ss58=sn_owner_hotkey,
+            netuid=self.config.netuid,
+        )
+        bt.logging.info(f"Subnet Owner UID (burn): {burn_uid}")
+        return burn_uid
+
+    def set_burn_weights(self):
+        """
+        Assigns 100% of the weight to the burn UID and pushes on-chain.
+        """
+        __version__ = "1.8.7"
+        version_split = __version__.split(".")
+        __version_as_int__ = (
+            100 * int(version_split[0])
+            + 10 * int(version_split[1])
+            + 1 * int(version_split[2])
+        )
+
+        burn_uid = self.get_burn_uid()
+        scores = torch.tensor([1.0], dtype=torch.float32)
+        scores[scores < 0] = 0
+        weights = torch.nn.functional.normalize(scores, p=1.0, dim=0).float()
+        bt.logging.info(f"🔥 Burn-only weight: {weights.tolist()}")
+
+        result = self.subtensor.set_weights(
+            netuid=self.config.netuid,
+            wallet=self.wallet,
+            uids=[burn_uid],
+            weights=weights,
+            version_key=__version_as_int__,
+            wait_for_inclusion=False,
+        )
+
+        if isinstance(result, tuple) and result[0]:
+            bt.logging.success("✅ Successfully set burn weights.")
+        else:
+            bt.logging.error(f"❌ Failed to set burn weights: {result}")
+
+    async def start(self):
+        """The Main Validation Loop"""
+        self.loop = asyncio.get_running_loop()
+         # Initialize time trackers
+        last_burn_weights_time = 0  # epoch time in seconds
+        burn_weights_interval = 20 * 60  # 20 minutes in seconds
+
+        bt.logging.info("Starting validator loop.")
         while True:
-            bt.logging.info(f"Validator running... {time.time()}")
-            time.sleep(5)
+            try:
+                self.sync()
+                
+                current_time = time.time()
+                if current_time - last_burn_weights_time >= burn_weights_interval:
+                    self.set_burn_weights()
+                    last_burn_weights_time = current_time
+
+                await asyncio.sleep(1)
+
+            except RuntimeError as e:
+                bt.logging.error(e)
+
+            except KeyboardInterrupt:
+                self.db.close()
+                bt.logging.success("Keyboard interrupt detected. Exiting validator.")
+                exit()
+
+
+def main():
+    """
+    Main function to run the neuron.
+    """
+    validator = Validator()
+    asyncio.run(validator.start())
+
+
+if __name__ == "__main__":
+    main()
