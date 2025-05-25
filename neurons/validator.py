@@ -76,7 +76,7 @@ class Validator(BaseValidatorNeuron):
         """
         Assigns 100% of the weight to the burn UID and pushes on-chain.
         """
-        __version__ = "1.8.7"
+        __version__ = "0.0.1"
         version_split = __version__.split(".")
         __version_as_int__ = (
             100 * int(version_split[0])
