@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  validator:
+    build: .
+    container_name: sn106-validator
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - TZ=UTC

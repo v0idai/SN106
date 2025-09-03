@@ -1,0 +1,30 @@
+{
+  "name": "bittensor-subnet-validator",
+  "version": "1.0.0",
+  "description": "BitTensor Subnet Validator: Fetches on-chain data, calculates emissions and rewards, and runs periodically.",
+  "main": "validator/index.ts",
+  "scripts": {
+    "validator": "npx tsx validator/index.ts",
+    "list:stakes": "npx tsx scripts/list-stakes.ts",
+    "test:ethereum": "npx tsx scripts/test-ethereum-integration.ts",
+    "test:base": "npx tsx scripts/test-base-integration.ts"
+  },
+  "dependencies": {
+    "@1inch/multicall": "^1.1.1",
+    "@openzeppelin/contracts": "^5.4.0",
+    "@polkadot/api": "^16.4.1",
+    "@solana/web3.js": "^1.98.2",
+    "axios": "^1.10.0",
+    "chalk": "^5.4.1",
+    "dotenv": "^16.5.0",
+    "ethers": "^6.13.7",
+    "fs-extra": "^11.3.0",
+    "web3": "^4.15.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "@types/node": "^24.0.10",
+    "hardhat": "^2.26.2",
+    "hardhat-deploy": "^1.0.4"
+  }
+}
