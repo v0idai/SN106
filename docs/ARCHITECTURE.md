@@ -621,7 +621,7 @@ ENABLED_CHAINS: 'SOLANA,ETHEREUM,BASE'
 // Subtensor Configuration
 SUBTENSOR: {
   WS_URL: 'wss://...',
-  HOTKEY_MNEMONIC: '...',
+  HOTKEY_URI: '...', // Can be private key, URI, or mnemonic
   NETUID: 106
 }
 

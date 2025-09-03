@@ -6,7 +6,7 @@ import path from 'path';
 
 export async function setWeightsOnSubtensor(
   wsUrl: string,
-  hotkeyMnemonic: string,
+  hotkeyUri: string,
   netuid: number,
   weights: Record<string, number>,
   addressToUid: Record<string, number>
@@ -17,7 +17,7 @@ export async function setWeightsOnSubtensor(
     const api = subtensorClient.getAPI();
     
     const keyring = new Keyring({ type: 'sr25519' });
-    const hotkey = keyring.addFromUri(hotkeyMnemonic);
+    const hotkey = keyring.addFromUri(hotkeyUri);
 
     // Map addresses to UIDs; filter unknown addresses
     const entries = Object.entries(weights).filter(([addr]) => addressToUid[addr] !== undefined);

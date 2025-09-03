@@ -43,7 +43,11 @@ export const ENV = {
 
   // Subtensor Configuration
   SUBTENSOR_WS_URL: process.env.SUBTENSOR_WS_URL || 'ws://localhost:9944',
-  VALIDATOR_HOTKEY_MNEMONIC: process.env.VALIDATOR_HOTKEY_MNEMONIC || '',
+  // VALIDATOR ONLY: this can be a private key, URI, or mnemonic
+  // Used to set weights on chain
+  // Supports: mnemonic, private key, or URI format
+  // Backward compatible with VALIDATOR_HOTKEY_MNEMONIC
+  VALIDATOR_HOTKEY_URI: process.env.VALIDATOR_HOTKEY_URI || process.env.VALIDATOR_HOTKEY_MNEMONIC || '',
   NETUID: Number(process.env.NETUID) || 106,
 
   // Bittensor Configuration
@@ -120,7 +124,7 @@ export const CONFIG = {
   // Subtensor
   SUBTENSOR: {
     WS_URL: ENV.SUBTENSOR_WS_URL,
-    HOTKEY_MNEMONIC: ENV.VALIDATOR_HOTKEY_MNEMONIC,
+    HOTKEY_URI: ENV.VALIDATOR_HOTKEY_URI,
     NETUID: ENV.NETUID,
   },
 

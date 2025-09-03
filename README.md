@@ -105,7 +105,9 @@ nano .env
 ```bash
 # Subtensor Configuration
 SUBTENSOR_WS_URL=wss://your-subtensor-endpoint
-VALIDATOR_HOTKEY_MNEMONIC=your-hotkey-mnemonic
+# VALIDATOR ONLY: this can be a private key, URI, or mnemonic
+# Used to set weights on chain
+VALIDATOR_HOTKEY_URI=your-hotkey-uri-or-mnemonic
 NETUID=106
 
 # Solana Configuration
@@ -117,6 +119,11 @@ RAYDIUM_CLMM_PROGRAM_ID=your-clmm-program-id
 # ETHEREUM_RPC_URL=https://your-ethereum-rpc
 # BASE_RPC_URL=https://your-base-rpc
 ```
+
+**Note**: The `VALIDATOR_HOTKEY_URI` supports multiple formats:
+- **Mnemonic**: `word1 word2 word3 ... word12`
+- **Private Key**: `0x1234...` (hex format)
+- **URI**: `//Alice` or other Polkadot-style URIs
 
 #### 5. Run the Validator
 ```bash

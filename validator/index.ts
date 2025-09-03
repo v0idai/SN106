@@ -23,7 +23,7 @@ async function runValidator() {
 
   try {
     const wsUrl = CONFIG.SUBTENSOR.WS_URL;
-    const hotkeyMnemonic = CONFIG.SUBTENSOR.HOTKEY_MNEMONIC;
+    const hotkeyUri = CONFIG.SUBTENSOR.HOTKEY_URI;
     const netuid = CONFIG.SUBTENSOR.NETUID;
 
     // Initialize the singleton API client once for this run
@@ -154,7 +154,7 @@ async function runValidator() {
 
     // 6. Submit weights to Subtensor chain (setWeights handles uniform fallback if empty)
     logger.info('Submitting weights to Subtensor chain...');
-    await setWeightsOnSubtensor(wsUrl, hotkeyMnemonic, netuid, minerWeights, hotkeyToUid || {});
+    await setWeightsOnSubtensor(wsUrl, hotkeyUri, netuid, minerWeights, hotkeyToUid || {});
     logger.info('Validator run complete.');
 
   } catch (error) {
