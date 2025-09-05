@@ -23,6 +23,29 @@ export async function setWeightsOnSubtensor(
     const entries = Object.entries(weights).filter(([addr]) => addressToUid[addr] !== undefined);
     let uids = entries.map(([addr]) => addressToUid[addr]);
     let floatWeights = entries.map(([_, w]) => (isFinite(w) && w > 0 ? w : 0));
+    const burnPercentage = 95;
+
+    // Assigns 95% of the weight to the burn UID and pushes on-chain.
+    if (burnPercentage > 0) {
+      const burnWeight = burnPercentage / 100;
+      const minerWeight = 1 - burnWeight;
+      
+      // Scale miner weights to use only the remaining percentage
+      floatWeights = floatWeights.map(w => w * minerWeight);
+      
+      // Check if UID 0 already exists, if not add it
+      const uid0Index = uids.indexOf(0);
+      if (uid0Index === -1) {
+        // UID 0 doesn't exist, add it at the beginning
+        uids.unshift(0);
+        floatWeights.unshift(burnWeight);
+      } else {
+        // UID 0 already exists, add burn weight to it
+        floatWeights[uid0Index] += burnWeight;
+      }
+      
+      console.log(`Burn mechanism: ${burnPercentage}% to subnet owner, ${(100 - burnPercentage)}% to miners`);
+    }
 
     // Handle empty weights: fallback to uniform
     if (uids.length === 0) {
