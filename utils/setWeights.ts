@@ -90,6 +90,7 @@ export async function setWeightsOnSubtensor(
     console.log('Setting weights on network...');
     console.log('UIDs:', uids);
     console.log('Scaled weights:', scaled);
+    console.log('Scaled weights sum:', scaled.reduce((a, b) => a + b, 0), 'count:', scaled.length);
     console.log('Version key:', versionKey);
 
     // Submit extrinsic
