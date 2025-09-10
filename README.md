@@ -118,12 +118,7 @@ RAYDIUM_CLMM_PROGRAM_ID=your-clmm-program-id
 # Coming Soon: Ethereum/Base Configuration
 # ETHEREUM_RPC_URL=https://your-ethereum-rpc
 # BASE_RPC_URL=https://your-base-rpc
-
-# Burn Mechanism Configuration
-BURN_PERCENTAGE=95
 ```
-
-**Note**: The burn mechanism works by burning the specified percentage (95%) to the subnet owner hotkey (UID 0) and distributing the remaining percentage (5%) among miners in a single `setWeights` call.
 
 **Note**: The `VALIDATOR_HOTKEY_URI` supports multiple formats:
 - **Mnemonic**: `word1 word2 word3 ... word12`
@@ -143,7 +138,7 @@ npm run validator
 2. **Performance Analysis**: Calculates current tick data and position quality
 3. **Weight Calculation**: Determines miner weights based on position quality and subnet performance
 4. **Weight Submission**: Submits calculated weights to the BitTensor network every 20 minutes
-5. **Burn Mechanism**: Burns 95% of emissions to the subnet owner hotkey, distributes remaining 5% to miners
+5. **Burn Mechanism**: Reserves 50% of emissions for subnet owner hotkey, distributes remaining 50% to miners
 
 ### Monitoring & Maintenance
 

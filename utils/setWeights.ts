@@ -25,12 +25,18 @@ export async function setWeightsOnSubtensor(
     let floatWeights = entries.map(([_, w]) => (isFinite(w) && w > 0 ? w : 0));
     const burnPercentage = 50;
 
-    // Assigns 95% of the weight to the burn UID and pushes on-chain.
+    // Assigns 50% of the weight to the burn UID and pushes on-chain.
     if (burnPercentage > 0) {
       const burnWeight = burnPercentage / 100;
       const minerWeight = 1 - burnWeight;
       
-      // Scale miner weights to use only the remaining percentage
+      // First, normalize miner weights to sum to 1.0
+      const currentMinerSum = floatWeights.reduce((a, b) => a + b, 0);
+      if (currentMinerSum > 0) {
+        floatWeights = floatWeights.map(w => w / currentMinerSum);
+      }
+      
+      // Then scale miner weights to use only the remaining percentage
       floatWeights = floatWeights.map(w => w * minerWeight);
       
       // Check if UID 0 already exists, if not add it
@@ -64,10 +70,8 @@ export async function setWeightsOnSubtensor(
     if (!sumFloat || sumFloat <= 0 || !isFinite(sumFloat)) {
       const uniform = 1 / uids.length;
       floatWeights = Array(uids.length).fill(uniform);
-    } else {
-      // Normalize to sum 1.0 prior to scaling
-      floatWeights = floatWeights.map(w => (w > 0 && isFinite(w) ? w / sumFloat : 0));
     }
+    // Note: With burn mechanism active, weights should already sum to 1.0 (burn + miners)
 
     // Scale to u16 (0..65535) and ensure sum == 65535
     let scaled = floatWeights.map(w => Math.round(w * 65535));
