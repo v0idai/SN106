@@ -25,33 +25,7 @@ export async function setWeightsOnSubtensor(
     let floatWeights = entries.map(([_, w]) => (isFinite(w) && w > 0 ? w : 0));
     const burnPercentage = 50;
 
-    // Assigns 50% of the weight to the burn UID and pushes on-chain.
-    if (burnPercentage > 0) {
-      const burnWeight = burnPercentage / 100;
-      const minerWeight = 1 - burnWeight;
-      
-      // First, normalize miner weights to sum to 1.0
-      const currentMinerSum = floatWeights.reduce((a, b) => a + b, 0);
-      if (currentMinerSum > 0) {
-        floatWeights = floatWeights.map(w => w / currentMinerSum);
-      }
-      
-      // Then scale miner weights to use only the remaining percentage
-      floatWeights = floatWeights.map(w => w * minerWeight);
-      
-      // Check if UID 0 already exists, if not add it
-      const uid0Index = uids.indexOf(0);
-      if (uid0Index === -1) {
-        // UID 0 doesn't exist, add it at the beginning
-        uids.unshift(0);
-        floatWeights.unshift(burnWeight);
-      } else {
-        // UID 0 already exists, add burn weight to it
-        floatWeights[uid0Index] += burnWeight;
-      }
-      
-      console.log(`Burn mechanism: ${burnPercentage}% to subnet owner, ${(100 - burnPercentage)}% to miners`);
-    }
+    // Burn mechanism: we will apply this after establishing base miner weights
 
     // Handle empty weights: fallback to uniform
     if (uids.length === 0) {
@@ -73,14 +47,99 @@ export async function setWeightsOnSubtensor(
     }
     // Note: With burn mechanism active, weights should already sum to 1.0 (burn + miners)
 
-    // Scale to u16 (0..65535) and ensure sum == 65535
-    let scaled = floatWeights.map(w => Math.round(w * 65535));
-    const totalScaled = scaled.reduce((a, b) => a + b, 0);
-    if (totalScaled === 0) {
-      throw new Error('All scaled weights are zero.');
+    // Scale to u16 (0..65535) with exact burn to UID 0 and largest-remainder to miners
+    const burnUid = 0;
+    let burnIdx = uids.indexOf(burnUid);
+    if (burnIdx === -1) {
+      // Ensure burn UID exists (user notes it always does, this is defensive)
+      uids.unshift(burnUid);
+      floatWeights.unshift(0);
+      burnIdx = 0;
     }
+
+    const burnProportion = burnPercentage / 100;
+    const minerProportion = 1 - burnProportion;
+
+    const minerIndices = uids.map((_, i) => i).filter(i => i !== burnIdx);
+    const minersCount = minerIndices.length;
+    const minerWeightsSum = minerIndices.reduce((acc, i) => acc + (isFinite(floatWeights[i]) && floatWeights[i] > 0 ? floatWeights[i] : 0), 0);
+
+    const desiredBurnInt = Math.round(burnProportion * 65535);
+    const minerTotalInt = 65535 - desiredBurnInt;
+
+    const minerFloatTargets: number[] = minerIndices.map(i => {
+      if (minerTotalInt <= 0) return 0;
+      if (minerWeightsSum <= 0 || !isFinite(minerWeightsSum)) return minerTotalInt / Math.max(minersCount, 1);
+      return (floatWeights[i] / minerWeightsSum) * minerTotalInt;
+    });
+
+    const minerFloors = minerFloatTargets.map(v => Math.floor(v));
+    let allocatedToMiners = minerFloors.reduce((a, b) => a + b, 0);
+    let minerRemainder = minerTotalInt - allocatedToMiners; // >= 0
+
+    if (minerRemainder > 0) {
+      const order = minerFloatTargets
+        .map((v, idx) => ({ idx, frac: v - Math.floor(v) }))
+        .sort((a, b) => b.frac - a.frac)
+        .map(x => x.idx);
+      for (let k = 0; k < minerRemainder && k < order.length; k++) {
+        minerFloors[order[k]] += 1;
+      }
+    }
+
+    const scaled: number[] = new Array(uids.length).fill(0);
+    scaled[burnIdx] = desiredBurnInt;
+    minerIndices.forEach((uidIdx, j) => {
+      scaled[uidIdx] = minerFloors[j];
+    });
+
+    let totalScaled = scaled.reduce((a, b) => a + b, 0);
     if (totalScaled !== 65535) {
-      scaled = scaled.map(w => Math.round((w * 65535) / totalScaled));
+      let delta = 65535 - totalScaled; // positive => need to add, negative => need to remove
+      if (delta > 0) {
+        if (minersCount > 0) {
+          const order2 = minerFloatTargets
+            .map((v, idx) => ({ idx, v }))
+            .sort((a, b) => b.v - a.v)
+            .map(x => x.idx);
+          let k = 0;
+          while (delta > 0 && minersCount > 0) {
+            const mIdx = order2[k % minersCount];
+            const uidIdx = minerIndices[mIdx];
+            scaled[uidIdx] += 1;
+            delta -= 1;
+            k += 1;
+          }
+        } else {
+          scaled[burnIdx] += delta;
+          delta = 0;
+        }
+      } else if (delta < 0) {
+        let remaining = -delta;
+        if (minersCount > 0) {
+          const order3 = minerIndices
+            .map((uidIdx, j) => ({ j, weight: scaled[uidIdx] }))
+            .sort((a, b) => b.weight - a.weight)
+            .map(x => x.j);
+          let t = 0;
+          while (remaining > 0 && minersCount > 0) {
+            const j = order3[t % minersCount];
+            const uidIdx = minerIndices[j];
+            if (scaled[uidIdx] > 0) {
+              scaled[uidIdx] -= 1;
+              remaining -= 1;
+            }
+            t += 1;
+            if (t > minersCount * 2 && remaining > 0) break;
+          }
+        }
+        if (remaining > 0) {
+          const take = Math.min(remaining, scaled[burnIdx]);
+          scaled[burnIdx] -= take;
+          remaining -= take;
+        }
+      }
+      totalScaled = scaled.reduce((a, b) => a + b, 0);
     }
 
     // Get current block number as version key
@@ -91,6 +150,10 @@ export async function setWeightsOnSubtensor(
     console.log('UIDs:', uids);
     console.log('Scaled weights:', scaled);
     console.log('Scaled weights sum:', scaled.reduce((a, b) => a + b, 0), 'count:', scaled.length);
+    const burnUnits = scaled[uids.indexOf(0)];
+    if (burnUnits !== undefined) {
+      console.log(`Burn UID 0 units: ${burnUnits} (~${((burnUnits / 65535) * 100).toFixed(4)}%), target: ${burnPercentage}%`);
+    }
     console.log('Version key:', versionKey);
 
     // Submit extrinsic
