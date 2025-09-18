@@ -7,7 +7,12 @@
     "validator": "npx tsx validator/index.ts",
     "list:stakes": "npx tsx scripts/list-stakes.ts",
     "test:ethereum": "npx tsx scripts/test-ethereum-integration.ts",
-    "test:base": "npx tsx scripts/test-base-integration.ts"
+    "test:base": "npx tsx scripts/test-base-integration.ts",
+    "export:neurons": "NETUID=${NETUID:-106} SUBTENSOR_WS_URL=${SUBTENSOR_WS_URL:-wss://entrypoint-finney.opentensor.ai:443} npx tsx scripts/export-neurons-csv.ts",
+    "export:solana:pools": "npx tsx scripts/export-solana-pools-csv.ts",
+    "export:positions": "npx tsx scripts/export-positions-json.ts",
+    "test": "npx tsx --test",
+    "test:cov": "c8 -r text -r html -r lcov npm run test"
   },
   "dependencies": {
     "@1inch/multicall": "^1.1.1",
@@ -18,13 +23,31 @@
     "chalk": "^5.4.1",
     "dotenv": "^16.5.0",
     "ethers": "^6.13.7",
-    "fs-extra": "^11.3.0",
+    "fs-extra": "^11.3.2",
     "web3": "^4.15.0"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^6.1.0",
     "@types/node": "^24.0.10",
     "hardhat": "^2.26.2",
-    "hardhat-deploy": "^1.0.4"
+    "hardhat-deploy": "^1.0.4",
+    "c8": "^9.1.0"
+  },
+  "c8": {
+    "include": [
+      "validator/calculations/**",
+      "utils/poolWeights.ts"
+    ],
+    "exclude": [
+      "node_modules/**",
+      "test/**",
+      "coverage/**",
+      "exports/**",
+      "scripts/**",
+      "validator/index.ts",
+      "validator/api/**",
+      "validator/chains/**",
+      "utils/bittensor.ts"
+    ]
   }
 }
