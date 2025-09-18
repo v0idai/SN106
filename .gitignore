@@ -23,3 +23,5 @@ artifacts/
 cache/
 evm-sample/
 weights/
+coverage/
+*.csv

@@ -32,7 +32,20 @@ function findCurrentTick(position: NFTPosition, currentTickPerPool: Record<strin
 function calculateRewardScore(position: NFTPosition, currentTick: number): number {
   const tickLower = position.tickLower;
   const tickUpper = position.tickUpper;
+  
+  // Missing/invalid tick or non-positive liquidity yields zero
+  if (!Number.isFinite(currentTick)) return 0;
+  if (!Number.isFinite(position.liquidity) || position.liquidity <= 0) return 0;
+  
+  // Check if position is in range - out-of-range positions get zero score
+  const isInRange = currentTick >= tickLower && currentTick <= tickUpper;
+  if (!isInRange) {
+    return 0;
+  }
+  
   const width = tickUpper - tickLower;
+  // Degenerate or invalid ranges are not rewarded
+  if (!Number.isFinite(width) || width <= 0) return 0;
   const center = (tickLower + tickUpper) / 2;
   const distanceFromCenter = Math.abs(center - currentTick);
   const widthPenalty = 1 / Math.pow(width, 1.2); // Penalize wider ranges
@@ -50,7 +63,8 @@ function calculateNFTEmissions(
   totalReward: number
 ): NFTEmissionResult[] {
   const scored = positions.map(pos => {
-    const currentTick = findCurrentTick(pos, currentTickPerPool) || 0;
+    const ct = findCurrentTick(pos, currentTickPerPool);
+    const currentTick = (typeof ct === 'number' && Number.isFinite(ct)) ? ct : NaN;
     const score = calculateRewardScore(pos, currentTick);
     return { ...pos, currentTick, score };
   });
