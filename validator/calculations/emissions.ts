@@ -32,6 +32,13 @@ function findCurrentTick(position: NFTPosition, currentTickPerPool: Record<strin
 function calculateRewardScore(position: NFTPosition, currentTick: number): number {
   const tickLower = position.tickLower;
   const tickUpper = position.tickUpper;
+  
+  // Check if position is in range - out-of-range positions get zero score
+  const isInRange = currentTick >= tickLower && currentTick <= tickUpper;
+  if (!isInRange) {
+    return 0;
+  }
+  
   const width = tickUpper - tickLower;
   const center = (tickLower + tickUpper) / 2;
   const distanceFromCenter = Math.abs(center - currentTick);

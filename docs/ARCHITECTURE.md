@@ -430,6 +430,13 @@ The validator uses a sophisticated scoring algorithm that considers multiple fac
 function calculateRewardScore(position: NFTPosition, currentTick: number): number {
   const tickLower = position.tickLower;
   const tickUpper = position.tickUpper;
+  
+  // Check if position is in range - out-of-range positions get zero score
+  const isInRange = currentTick >= tickLower && currentTick <= tickUpper;
+  if (!isInRange) {
+    return 0;
+  }
+  
   const width = tickUpper - tickLower;
   const center = (tickLower + tickUpper) / 2;
   const distanceFromCenter = Math.abs(center - currentTick);
@@ -449,9 +456,10 @@ function calculateRewardScore(position: NFTPosition, currentTick: number): numbe
 ```
 
 **Scoring Factors:**
-1. **Position Width**: Narrower ranges (more concentrated) get higher scores
-2. **Distance from Current Tick**: Positions closer to current tick get higher scores
-3. **Liquidity**: Higher liquidity positions get proportionally higher scores
+1. **Range Check**: Only in-range positions (currentTick within [tickLower, tickUpper]) get non-zero scores
+2. **Position Width**: Narrower ranges (more concentrated) get higher scores
+3. **Distance from Current Tick**: Positions closer to current tick get higher scores
+4. **Liquidity**: Higher liquidity positions get proportionally higher scores
 
 ### Pool-Wise Emission Distribution
 

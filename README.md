@@ -135,7 +135,7 @@ npm run validator
 ### What the Validator Does
 
 1. **Data Collection**: Fetches NFT liquidity positions from enabled chains
-2. **Performance Analysis**: Calculates current tick data and position quality
+2. **Performance Analysis**: Calculates current tick data and position quality (only in-range positions get rewards)
 3. **Weight Calculation**: Determines miner weights based on position quality and subnet performance
 4. **Weight Submission**: Submits calculated weights to the BitTensor network every 20 minutes
 5. **Burn Mechanism**: Reserves 50% of emissions for subnet owner hotkey, distributes remaining 50% to miners
