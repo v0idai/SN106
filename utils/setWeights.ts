@@ -23,7 +23,7 @@ export async function setWeightsOnSubtensor(
     const entries = Object.entries(weights).filter(([addr]) => addressToUid[addr] !== undefined);
     let uids = entries.map(([addr]) => addressToUid[addr]);
     let floatWeights = entries.map(([_, w]) => (isFinite(w) && w > 0 ? w : 0));
-    const burnPercentage = 50;
+    const burnPercentage = 0; // burn disabled
 
     // Burn mechanism: we will apply this after establishing base miner weights
 
@@ -45,13 +45,13 @@ export async function setWeightsOnSubtensor(
       const uniform = 1 / uids.length;
       floatWeights = Array(uids.length).fill(uniform);
     }
-    // Note: With burn mechanism active, weights should already sum to 1.0 (burn + miners)
+    // Note: With burn mechanism disabled, all weight is allocated to miners (sum to 1.0)
 
-    // Scale to u16 (0..65535) with exact burn to UID 0 and largest-remainder to miners
+    // Scale to u16 (0..65535). Burn to UID 0 is currently disabled; remainder to miners via largest-remainder
     const burnUid = 0;
     let burnIdx = uids.indexOf(burnUid);
     if (burnIdx === -1) {
-      // Ensure burn UID exists (user notes it always does, this is defensive)
+      // Ensure burn UID exists (defensive; safe even when burn is 0)
       uids.unshift(burnUid);
       floatWeights.unshift(0);
       burnIdx = 0;
@@ -151,8 +151,10 @@ export async function setWeightsOnSubtensor(
     console.log('Scaled weights:', scaled);
     console.log('Scaled weights sum:', scaled.reduce((a, b) => a + b, 0), 'count:', scaled.length);
     const burnUnits = scaled[uids.indexOf(0)];
-    if (burnUnits !== undefined) {
+    if (burnPercentage > 0) {
       console.log(`Burn UID 0 units: ${burnUnits} (~${((burnUnits / 65535) * 100).toFixed(4)}%), target: ${burnPercentage}%`);
+    } else {
+      console.log('Burn disabled (0%). No units allocated to UID 0.');
     }
     console.log('Version key:', versionKey);
 
