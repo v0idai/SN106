@@ -138,7 +138,7 @@ npm run validator
 2. **Performance Analysis**: Calculates current tick data and position quality (only in-range positions get rewards)
 3. **Weight Calculation**: Determines miner weights based on position quality and subnet performance
 4. **Weight Submission**: Submits calculated weights to the BitTensor network every 20 minutes
-5. **Burn Mechanism**: Reserves 50% of emissions for subnet owner hotkey, distributes remaining 50% to miners
+5. **Distribution Policy**: Burn disabled (0%). 100% of weight is allocated to miners; UID 0 receives 0 units.
 
 ### Monitoring & Maintenance
 
