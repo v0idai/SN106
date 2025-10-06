@@ -69,7 +69,7 @@ export const ENV = {
 } as const;
 
 // Supported chain types
-export type SupportedChain = 'solana';
+export type SupportedChain = 'solana' | 'ethereum' | 'base';
 
 /**
  * Validated configuration with computed values
@@ -86,9 +86,21 @@ export const CONFIG = {
   // Chain Configuration
   getEnabledChains(): SupportedChain[] {
     const chainsEnv = ENV.ENABLED_CHAINS.toUpperCase();
-    const allChains: SupportedChain[] = ['solana'];
+    const allChains: SupportedChain[] = ['solana', 'ethereum', 'base'];
 
-    return allChains;
+    if (chainsEnv === 'ALL') {
+      return allChains;
+    }
+
+    const enabledChains = chainsEnv
+      .split(',')
+      .map(chain => chain.trim().toLowerCase())
+      .filter((chain): chain is SupportedChain =>
+        allChains.includes(chain as SupportedChain),
+      );
+
+    // Default to all chains if none specified or invalid
+    return enabledChains.length > 0 ? enabledChains : allChains;
   },
 
   isChainEnabled(chain: SupportedChain): boolean {
