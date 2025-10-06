@@ -23,7 +23,11 @@ export async function setWeightsOnSubtensor(
     const entries = Object.entries(weights).filter(([addr]) => addressToUid[addr] !== undefined);
     let uids = entries.map(([addr]) => addressToUid[addr]);
     let floatWeights = entries.map(([_, w]) => (isFinite(w) && w > 0 ? w : 0));
+<<<<<<< HEAD
     const burnPercentage = 0; // burn disabled
+=======
+    const burnPercentage = 0;
+>>>>>>> 88bc7d6 (added evm validator logics)
 
     // Burn mechanism: we will apply this after establishing base miner weights
 
