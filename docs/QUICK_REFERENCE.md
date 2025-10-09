@@ -66,7 +66,7 @@ ENABLED_CHAINS=SOLANA,...
 # Validator settings
 USE_EMA=true
 EMA_ALPHA=0.8
-INTERVAL_MINUTES=5
+INTERVAL_MINUTES=20
 
 # Performance settings
 MAX_RETRIES=3
