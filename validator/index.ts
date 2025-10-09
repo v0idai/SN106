@@ -91,7 +91,8 @@ async function runValidator() {
       currentTickPerPool,
       subnetAlphaPrices,
       filteredSubnetIds,
-      0.25 // reserved share for subnet 0 pools
+      0.20, // reserved share for subnet 0 pools
+      0.10  // reserved share for subnet 106 pools
     );
 
     logger.info('Subnet weights (raw alpha prices):', subnetWeights);
@@ -100,6 +101,7 @@ async function runValidator() {
     // 4. Calculate per-NFT emissions pool-wise
     const nftEmissions = calculatePoolwiseNFTEmissions(positions, currentTickPerPool, poolWeights, 1.0);
     logger.info('Per-NFT emissions (pool-wise):', nftEmissions);
+    
 
     // 5. Aggregate per-miner emissions
     const minerWeightsRaw = nftEmissions.reduce<Record<string, number>>((acc, nft) => {

@@ -35,8 +35,9 @@ Step 2: Calculate Subnet Weights
 └── Subnet 3: 0.98/3.0 = 0.327
 
 Step 3: Distribute to Pools (Reserved-Share Logic)
-├── Reserve e.g., 0.25 equally for pools with no alpha tokens
-├── Remaining 0.75 split across non-zero-alpha subnets by alpha proportion
+├── Reserve 0.20 equally for subnet 0 pools (no alpha tokens)
+├── Reserve 0.10 equally for subnet 106 pools
+├── Remaining 0.70 split across other non-zero-alpha subnets by alpha proportion
 └── Within each subnet, split equally across its pools
 
 Step 4: Calculate NFT Emissions
