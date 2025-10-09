@@ -636,7 +636,7 @@ SUBTENSOR: {
 // Validator Configuration
 VALIDATOR: {
   USE_EMA: true,
-  EMA_ALPHA: 0.3,
+  EMA_ALPHA: 0.8,
   EMA_EPSILON: 0.001,
   INTERVAL_MINUTES: 5
 }

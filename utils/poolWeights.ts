@@ -16,7 +16,8 @@ export function calculatePoolWeightsWithReservedPools(
   currentTickPerPool: Record<string, PoolTickData>,
   subnetAlphaPrices: Record<number, number>,
   filterNetuids: number[],
-  reservedZeroSubnetShare: number = 0.25
+  reservedZeroSubnetShare: number = 0.20,
+  reservedSubnet106Share: number = 0.10
 ): {
   subnetWeights: Record<number, number>;
   poolWeights: Record<string, number>;
@@ -45,10 +46,12 @@ export function calculatePoolWeightsWithReservedPools(
     }
   }
 
-  // Reserve a fixed share for subnet id 0 pools
+  // Reserve fixed shares for subnet id 0 and subnet id 106 pools
   const zeroSubnetPools = poolsBySubnet[0] || [];
+  const subnet106Pools = poolsBySubnet[106] || [];
   const zeroShare = zeroSubnetPools.length > 0 ? Math.max(0, Math.min(1, reservedZeroSubnetShare)) : 0;
-  const remainingShare = 1 - zeroShare;
+  const subnet106Share = subnet106Pools.length > 0 ? Math.max(0, Math.min(1 - zeroShare, reservedSubnet106Share)) : 0;
+  const remainingShare = Math.max(0, 1 - zeroShare - subnet106Share);
 
   // Assign reserved share equally to subnet 0 pools
   if (zeroSubnetPools.length > 0) {
@@ -58,10 +61,18 @@ export function calculatePoolWeightsWithReservedPools(
     }
   }
 
-  // Distribute remaining share across non-zero subnets based on alpha prices
+  // Assign reserved share equally to subnet 106 pools
+  if (subnet106Pools.length > 0 && subnet106Share > 0) {
+    const perSubnet106Pool = subnet106Pools.length > 0 ? subnet106Share / subnet106Pools.length : 0;
+    for (const pool of subnet106Pools) {
+      poolWeights[pool] = (poolWeights[pool] || 0) + perSubnet106Pool;
+    }
+  }
+
+  // Distribute remaining share across non-zero subnets (excluding 0 and 106) based on alpha prices
   const nonZeroSubnetIds = Object.keys(poolsBySubnet)
     .map(x => Number(x))
-    .filter(id => id !== 0);
+    .filter(id => id !== 0 && id !== 106);
 
   const totalAlphaNonZero = nonZeroSubnetIds.reduce((sum, id) => sum + (subnetWeights[id] || 0), 0);
 

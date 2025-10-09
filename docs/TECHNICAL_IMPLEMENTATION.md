@@ -557,7 +557,7 @@ const updateEma = (prev: Record<string, number>, curr: Record<string, number>): 
 
 ```typescript
 // EMA configuration/state (kept across scheduled runs)
-const EMA_ALPHA: number = Number(CONFIG.VALIDATOR.EMA_ALPHA) || 0.3;
+const EMA_ALPHA: number = Number(CONFIG.VALIDATOR.EMA_ALPHA) || 0.8;
 
 // Persist EMA weights on module scope between runs
 if (!global.__sn106EmaWeights) {
