@@ -16,8 +16,8 @@ export function calculatePoolWeightsWithReservedPools(
   currentTickPerPool: Record<string, PoolTickData>,
   subnetAlphaPrices: Record<number, number>,
   filterNetuids: number[],
-  reservedZeroSubnetShare: number = 0.20,
-  reservedSubnet106Share: number = 0.10
+  reservedZeroSubnetShare: number = 0.15,
+  reservedSubnet106Share: number = 0.15
 ): {
   subnetWeights: Record<number, number>;
   poolWeights: Record<string, number>;
@@ -69,32 +69,34 @@ export function calculatePoolWeightsWithReservedPools(
     }
   }
 
-  // Distribute remaining share across non-zero subnets (excluding 0 and 106) based on alpha prices
-  const nonZeroSubnetIds = Object.keys(poolsBySubnet)
-    .map(x => Number(x))
-    .filter(id => id !== 0 && id !== 106);
+  // Distribute remaining share across top-10 pools by subnet alpha (excluding subnets 0 and 106)
+  const candidatePools: Array<{ pool: string; subnetId: number; alpha: number }> = [];
+  for (const [subnetIdStr, pools] of Object.entries(poolsBySubnet)) {
+    const subnetId = Number(subnetIdStr);
+    if (subnetId === 0 || subnetId === 106) continue;
+    const alpha = subnetWeights[subnetId] || 0;
+    for (const pool of pools) {
+      candidatePools.push({ pool, subnetId, alpha });
+    }
+  }
 
-  const totalAlphaNonZero = nonZeroSubnetIds.reduce((sum, id) => sum + (subnetWeights[id] || 0), 0);
+  // Rank pools by their subnet's alpha price; ties arbitrary
+  candidatePools.sort((a, b) => (b.alpha || 0) - (a.alpha || 0));
+  const topPools = candidatePools.slice(0, 10);
 
-  if (nonZeroSubnetIds.length === 0) {
-    // nothing to do, all weight already allocated to subnet 0 pools (if any)
-  } else if (totalAlphaNonZero > 0) {
-    // Price-weighted distribution across subnets, then equal per pool within subnet
-    for (const subnetId of nonZeroSubnetIds) {
-      const subnetAlpha = subnetWeights[subnetId] || 0;
-      const subnetPortion = (subnetAlpha / totalAlphaNonZero) * remainingShare;
-      const pools = poolsBySubnet[subnetId] || [];
-      const perPool = pools.length > 0 ? subnetPortion / pools.length : 0;
-      for (const pool of pools) {
+  if (topPools.length > 0) {
+    const sumAlpha = topPools.reduce((s, p) => s + (p.alpha || 0), 0);
+    if (sumAlpha > 0) {
+      for (const { pool, alpha } of topPools) {
+        const portion = (alpha || 0) / sumAlpha;
+        poolWeights[pool] = (poolWeights[pool] || 0) + remainingShare * portion;
+      }
+    } else {
+      // Fallback: if all alphas are zero, split equally among top pools
+      const perPool = remainingShare / topPools.length;
+      for (const { pool } of topPools) {
         poolWeights[pool] = (poolWeights[pool] || 0) + perPool;
       }
-    }
-  } else {
-    // Fallback: distribute remaining share equally across all non-zero pools
-    const allNonZeroPools = nonZeroSubnetIds.flatMap(id => poolsBySubnet[id] || []);
-    const perPool = allNonZeroPools.length > 0 ? remainingShare / allNonZeroPools.length : 0;
-    for (const pool of allNonZeroPools) {
-      poolWeights[pool] = (poolWeights[pool] || 0) + perPool;
     }
   }
 

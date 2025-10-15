@@ -146,11 +146,52 @@ export interface PoolTickData {
  * Solana Raydium tick fetcher
  * Fetches current tick data from Raydium CLMM pools
  */
-export async function getCurrentTickPerPool(): Promise<Record<string, PoolTickData>> {
+/**
+ * Return a list of active pools with their subnet IDs (no tick fetch).
+ */
+export async function getActivePools(): Promise<Array<{ poolId: string; subnetId: number }>> {
+  logger.info(`[Solana] 🔍 Listing active pools with subnet IDs`);
+  const connection = createConnection();
+  const pools: Array<{ poolId: string; subnetId: number }> = [];
+
+  // Get all pool record accounts for the program
+  const accounts = await withRetry(
+    () => connection.getProgramAccounts(PROGRAM_ID),
+    CONFIG.PERFORMANCE.MAX_RETRIES,
+    'getProgramAccounts for pool records'
+  );
+
+  for (const { account, pubkey } of accounts) {
+    try {
+      const decoded = decodePoolRecord(account.data);
+      if (!decoded.isActive) continue;
+      // Use the poolId present in the pool record so it matches tick fetcher
+      pools.push({ poolId: decoded.poolId.toBase58(), subnetId: decoded.subnetId });
+    } catch {
+      // ignore malformed accounts
+    }
+  }
+
+  return pools;
+}
+
+export async function getCurrentTickPerPool(allowedPools?: Set<string>): Promise<Record<string, PoolTickData>> {
   logger.info(`🔍 [Solana] Fetching current tick data from Raydium CLMM pools`);
   logger.info(`📡 [Solana] RPC Endpoint: ${RPC_ENDPOINT}`);
   logger.info(`🏗️ [Solana] Program ID: ${PROGRAM_ID.toBase58()}`);
   logger.info(`🏗️ [Solana] CLMM Program ID: ${CLMM_PROGRAM_ID.toBase58()}`);
+  const verbose = (process.env.LOG_VERBOSE_TICKS || '').toLowerCase() === 'true';
+  if (allowedPools) {
+    const size = allowedPools.size;
+    if (verbose) {
+      const sample = Array.from(allowedPools).slice(0, 5);
+      logger.info(`[Solana] 🔎 allowedPools size: ${size}; sample: ${JSON.stringify(sample)}`);
+    } else {
+      logger.info(`[Solana] 🔎 allowedPools size: ${size}`);
+    }
+  } else if (verbose) {
+    logger.info(`[Solana] 🔎 allowedPools not provided; fetching all ticks`);
+  }
 
   const connection = createConnection();
   const startTime = Date.now();
@@ -205,6 +246,13 @@ export async function getCurrentTickPerPool(): Promise<Record<string, PoolTickDa
     // For each active pool, fetch current tick information
     for (let index = 0; index < poolRecords.length; index++) {
       const pool = poolRecords[index];
+      const idStr = pool.poolId.toBase58();
+      if (allowedPools && !allowedPools.has(idStr)) {
+        if (verbose) {
+          logger.info(`[Solana] ⏭️ Skipping pool not in allowed set: ${idStr}`);
+        }
+        continue;
+      }
       
       // Fetch and decode CLMM PoolState to get current tick
       let tickCurrent: number | null = null;
