@@ -127,8 +127,8 @@ async function runValidator() {
       currentTickPerPool,
       subnetAlphaPrices,
       filteredSubnetIds,
-      0.15, // reserved share for subnet 0 pools
-      0.10  // reserved share for subnet 106 pools
+      0.15, // reserved share for non-subnet pools
+      0.15  // reserved share for subnet 106 pools
     );
 
     logger.info('Subnet weights (raw alpha prices):', subnetWeights);
