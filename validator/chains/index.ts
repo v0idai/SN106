@@ -2,7 +2,7 @@ import { NFTPosition } from '../calculations/emissions';
 import { logger } from '../../utils/logger';
 import { CONFIG, SupportedChain } from '../../config/environment';
 import { getAllNFTPositions as getSolanaPositions } from './solana/index';
-import { getCurrentTickPerPool as getSolanaTicks, PoolTickData as SolanaPoolTickData } from './solana/index';
+import { getCurrentTickPerPool as getSolanaTicks, listActivePools as getSolanaActivePools, PoolTickData as SolanaPoolTickData } from './solana/index';
 
 /**
  * Multi-chain position fetcher
@@ -73,7 +73,7 @@ export type { SupportedChain };
  * Fetches current tick data from enabled chains only
  * Returns enhanced data with both tick and subnet_id
  */
-export async function getCurrentTickPerPool(): Promise<Record<string, PoolTickData>> {
+export async function getCurrentTickPerPool(allowedPools?: Set<string>): Promise<Record<string, PoolTickData>> {
   const enabledChains = CONFIG.getEnabledChains();
   logger.info(`🔍 Fetching current tick data from enabled chains [${enabledChains.join(', ')}]`);
   
@@ -86,8 +86,17 @@ export async function getCurrentTickPerPool(): Promise<Record<string, PoolTickDa
     const chainNames: string[] = [];
     
     if (enabledChains.includes('solana')) {
+      // Normalize allowed pool IDs to chain-specific format (strip chain prefix)
+      let solanaAllowed: Set<string> | undefined = undefined;
+      if (allowedPools && allowedPools.size > 0) {
+        const arr = Array.from(allowedPools);
+        const filtered = arr
+          .filter(k => k.startsWith('solana:'))
+          .map(k => k.slice('solana:'.length));
+        if (filtered.length > 0) solanaAllowed = new Set(filtered);
+      }
       chainPromises.push(
-        getSolanaTicks().catch((error: unknown) => {
+        getSolanaTicks(solanaAllowed).catch((error: unknown) => {
           logger.error("❌ Solana tick fetch failed:", error);
           return {};
         })
@@ -184,6 +193,25 @@ export function isChainEnabled(chain: SupportedChain): boolean {
  */
 export function getAllSupportedChains(): SupportedChain[] {
   return ['solana'];
+}
+
+/**
+ * Multi-chain active pool lister (poolId without chain prefix, subnetId)
+ */
+export async function listActivePools(): Promise<Array<{ chain: SupportedChain; poolId: string; subnetId: number }>> {
+  const enabledChains = CONFIG.getEnabledChains();
+  const result: Array<{ chain: SupportedChain; poolId: string; subnetId: number }> = [];
+  if (enabledChains.includes('solana')) {
+    try {
+      const pools = await getSolanaActivePools();
+      for (const p of pools) {
+        result.push({ chain: 'solana', poolId: p.poolId, subnetId: p.subnetId });
+      }
+    } catch (e) {
+      logger.error('❌ Solana active pool list failed:', e);
+    }
+  }
+  return result;
 }
 
 /**

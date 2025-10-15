@@ -1,7 +1,7 @@
 import { NFTPosition } from '../../calculations/emissions';
 import { logger } from '../../../utils/logger';
 import { getAllNFTPositions as getRaydiumPositions } from './dexes/raydium/positions';
-import { getCurrentTickPerPool as getRaydiumTicks, PoolTickData } from './dexes/raydium/ticks';
+import { getCurrentTickPerPool as getRaydiumTicks, getActivePools as getRaydiumActivePools, PoolTickData } from './dexes/raydium/ticks';
 
 // Re-export the interface for external use
 export type { PoolTickData };
@@ -58,14 +58,14 @@ export async function getAllNFTPositions(hotkeys: string[]): Promise<NFTPosition
  * Aggregates current tick data from all supported DEXes on Solana
  * Returns enhanced data with both tick and subnet_id
  */
-export async function getCurrentTickPerPool(): Promise<Record<string, PoolTickData>> {
+export async function getCurrentTickPerPool(allowedPools?: Set<string>): Promise<Record<string, PoolTickData>> {
   const allTicks: Record<string, PoolTickData> = {};
   const startTime = Date.now();
 
   try {
     // Fetch ticks from all DEXes concurrently
     const dexPromises = [
-      getRaydiumTicks().catch((error: unknown) => {
+      getRaydiumTicks(allowedPools).catch((error: unknown) => {
         logger.error("❌ [Solana/Raydium] Tick fetch failed:", error);
         return {};
       })
@@ -95,5 +95,18 @@ export async function getCurrentTickPerPool(): Promise<Record<string, PoolTickDa
     const totalTime = Date.now() - startTime;
     logger.error(`❌ [Solana] Multi-DEX tick fetch failed after ${totalTime}ms:`, error);
     throw new Error(`Solana multi-DEX tick fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * List active pool IDs with subnet IDs on Solana.
+ */
+export async function listActivePools(): Promise<Array<{ poolId: string; subnetId: number }>> {
+  try {
+    const pools = await getRaydiumActivePools();
+    return pools;
+  } catch (error) {
+    logger.error('❌ [Solana] Active pool list failed:', error);
+    return [];
   }
 }

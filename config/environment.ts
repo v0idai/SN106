@@ -13,7 +13,7 @@ export const ENV = {
   // Validator Configuration
   VALIDATOR_INTERVAL_MINUTES: process.env.VALIDATOR_INTERVAL_MINUTES || 20,
   USE_EMA: (process.env.USE_EMA ?? 'true').toLowerCase() !== 'false',
-  EMA_ALPHA: Number(process.env.EMA_ALPHA) || 0.8,
+  EMA_ALPHA: Number(process.env.EMA_ALPHA) || 0.6,
   EMA_EPSILON: Number(process.env.EMA_EPSILON) || 1e-6,
 
   // Chain Configuration

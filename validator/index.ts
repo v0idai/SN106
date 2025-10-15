@@ -10,7 +10,7 @@ import { CONFIG } from '../config/environment';
 import { setWeightsOnSubtensor } from '../utils/setWeights';
 import { getHotkeyToUidMap, getSubnetAlphaPrices } from '../utils/bittensor';
 import { calculatePoolWeightsWithReservedPools } from '../utils/poolWeights';
-import { getAllNFTPositions, getCurrentTickPerPool } from './chains';
+import { getAllNFTPositions, getCurrentTickPerPool, listActivePools } from './chains';
 import { calculatePoolwiseNFTEmissions } from './calculations/emissions';
 import { subtensorClient } from './api';
 
@@ -72,38 +72,74 @@ async function runValidator() {
     const positions = await getAllNFTPositions(hotkeys);
     logger.info(`Found ${positions.length} NFT positions across all chains`);
 
-    // 2. Fetch current tick per pool
-    logger.info('Fetching current tick data for all pools...');
-    const currentTickPerPool = await getCurrentTickPerPool();
-    logger.info(`Fetched tick data for ${Object.keys(currentTickPerPool).length} pools`);
-    
-    const filteredSubnetIds = [...new Set(Object.values(currentTickPerPool).map(p => p.subnetId))];
-    logger.info('Fetching subnet-alpha-price map from chain...');
-    const [subnetAlphaPrices, err] = await getSubnetAlphaPrices(wsUrl, filteredSubnetIds);
+    // 2. Fetch supported pools (subnet mapping) first
+    logger.info('Listing active pools (pool->subnet map)...');
+    const activePools = await listActivePools();
+    const poolsBySubnet: Record<number, string[]> = {};
+    for (const p of activePools) {
+      const key = `${p.chain}:${p.poolId}`;
+      if (!poolsBySubnet[p.subnetId]) poolsBySubnet[p.subnetId] = [];
+      poolsBySubnet[p.subnetId].push(key);
+    }
+    const supportedSubnetIds = Object.keys(poolsBySubnet).map(x => Number(x));
+
+    // 3. Fetch alpha prices for all supported subnets
+    logger.info('Fetching subnet-alpha-price map from chain (all supported)...');
+    const [subnetAlphaPrices, err] = await getSubnetAlphaPrices(wsUrl, supportedSubnetIds);
     if (err) {
       logger.error('Failed to fetch subnet-alpha-price map:', err);
     } 
     logger.info(`Fetched ${Object.keys(subnetAlphaPrices).length} subnet alpha prices from chain`);
 
-    // 3. Build pool weights based on alpha token prices with reserved share for subnet 0
+    // 4. Select relevant pools: subnet 0, subnet 106, and top-10 pools by subnet alpha
+    const selectedPools = new Set<string>();
+    for (const pool of (poolsBySubnet[0] || [])) selectedPools.add(pool);
+    for (const pool of (poolsBySubnet[106] || [])) selectedPools.add(pool);
+
+    const subnetAlphaEntries = supportedSubnetIds
+      .filter(id => id !== 0 && id !== 106)
+      .map(id => ({ id, alpha: subnetAlphaPrices[id] || 0 }))
+      .sort((a, b) => b.alpha - a.alpha);
+    // rank pools by their subnet alpha; gather until 10 pools total after reserved
+    const topPoolCandidates: string[] = [];
+    for (const { id } of subnetAlphaEntries) {
+      const pools = poolsBySubnet[id] || [];
+      for (const pool of pools) {
+        topPoolCandidates.push(pool);
+        if (topPoolCandidates.length >= 10) break;
+      }
+      if (topPoolCandidates.length >= 10) break;
+    }
+    for (const pool of topPoolCandidates) selectedPools.add(pool);
+
+    logger.info(`Selected ${selectedPools.size} pools for tick fetching`);
+
+    // 5. Fetch current ticks only for selected pools
+    logger.info('Fetching current tick data for selected pools...');
+    const currentTickPerPool = await getCurrentTickPerPool(selectedPools);
+    logger.info(`Fetched tick data for ${Object.keys(currentTickPerPool).length} pools`);
+    
+    const filteredSubnetIds = [...new Set(Object.values(currentTickPerPool).map(p => p.subnetId))];
+
+    // 6. Build pool weights with new shares and top-10 policy
     const { subnetWeights, poolWeights } = calculatePoolWeightsWithReservedPools(
       positions,
       currentTickPerPool,
       subnetAlphaPrices,
       filteredSubnetIds,
-      0.20, // reserved share for subnet 0 pools
+      0.15, // reserved share for subnet 0 pools
       0.10  // reserved share for subnet 106 pools
     );
 
     logger.info('Subnet weights (raw alpha prices):', subnetWeights);
     logger.info('Pool weights (after reserved share and alpha weighting):', poolWeights);
 
-    // 4. Calculate per-NFT emissions pool-wise
+    // 7. Calculate per-NFT emissions pool-wise
     const nftEmissions = calculatePoolwiseNFTEmissions(positions, currentTickPerPool, poolWeights, 1.0);
     logger.info('Per-NFT emissions (pool-wise):', nftEmissions);
     
 
-    // 5. Aggregate per-miner emissions
+    // 8. Aggregate per-miner emissions
     const minerWeightsRaw = nftEmissions.reduce<Record<string, number>>((acc, nft) => {
       acc[nft.miner] = (acc[nft.miner] || 0) + nft.emission;
       return acc;
