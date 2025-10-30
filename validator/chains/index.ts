@@ -157,9 +157,18 @@ export async function getCurrentTickPerPool(allowedPools?: Set<string>): Promise
     // }
 
     if (enabledChains.includes('ethereum')) {
+      // Normalize allowed pool IDs to chain-specific format (strip chain prefix)
       logger.info('[Multi-chain] 🔍 Fetching Ethereum ticks...');
+      let ethereumAllowed: Set<string> | undefined = undefined;
+      if (allowedPools && allowedPools.size > 0) {
+        const arr = Array.from(allowedPools);
+        const filtered = arr
+          .filter(k => k.startsWith('ethereum:'))
+          .map(k => k.slice('ethereum:'.length));
+        if (filtered.length > 0) ethereumAllowed = new Set(filtered);
+      }
       try {
-        const ethereumTicks = await getEthereumTicks();
+        const ethereumTicks = await getEthereumTicks(ethereumAllowed);
         results.push(ethereumTicks);
         chainNames.push('ethereum');
       } catch (error: unknown) {
@@ -170,9 +179,18 @@ export async function getCurrentTickPerPool(allowedPools?: Set<string>): Promise
     }
 
     if (enabledChains.includes('base')) {
+      // Normalize allowed pool IDs to chain-specific format (strip chain prefix)
       logger.info('[Multi-chain] 🔍 Fetching Base ticks...');
+      let baseAllowed: Set<string> | undefined = undefined;
+      if (allowedPools && allowedPools.size > 0) {
+        const arr = Array.from(allowedPools);
+        const filtered = arr
+          .filter(k => k.startsWith('base:'))
+          .map(k => k.slice('base:'.length));
+        if (filtered.length > 0) baseAllowed = new Set(filtered);
+      }
       try {
-        const baseTicks = await getBaseTicks();
+        const baseTicks = await getBaseTicks(baseAllowed);
         results.push(baseTicks);
         chainNames.push('base');
       } catch (error: unknown) {
@@ -252,6 +270,7 @@ export async function getPositionsByChain(
  */
 export async function getTicksByChain(
   chain: SupportedChain,
+  allowedPools?: Set<string>,
 ): Promise<Record<string, PoolTickData>> {
   if (!CONFIG.isChainEnabled(chain)) {
     logger.info(`📝 Chain ${chain} is not enabled, returning empty ticks`);
@@ -260,11 +279,11 @@ export async function getTicksByChain(
 
   switch (chain) {
     case 'solana':
-      return await getSolanaTicks();
+      return await getSolanaTicks(allowedPools);
     case 'ethereum':
-      return await getEthereumTicks();
+      return await getEthereumTicks(allowedPools);
     case 'base':
-      return await getBaseTicks();
+      return await getBaseTicks(allowedPools);
     default:
       throw new Error(`Unsupported chain: ${chain}`);
   }
