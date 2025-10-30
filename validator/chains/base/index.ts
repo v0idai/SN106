@@ -82,7 +82,7 @@ export async function getAllNFTPositions(
  * Aggregates current tick data from all supported DEXes on Base
  * Returns enhanced data with both tick and subnet_id
  */
-export async function getCurrentTickPerPool(): Promise<
+export async function getCurrentTickPerPool(allowedPools?: Set<string>): Promise<
   Record<string, PoolTickData>
 > {
   const allTicks: Record<string, PoolTickData> = {};
@@ -91,7 +91,7 @@ export async function getCurrentTickPerPool(): Promise<
   try {
     // Fetch ticks from all DEXes concurrently
     const dexPromises = [
-      getUniswapV3Ticks().catch((error: unknown) => {
+      getUniswapV3Ticks(allowedPools).catch((error: unknown) => {
         // Check if it's a contract deployment issue vs actual error
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';
@@ -111,7 +111,7 @@ export async function getCurrentTickPerPool(): Promise<
         return {};
       }),
       // Future DEXes can be added here
-      // getAerodromeTicks().catch((error: unknown) => {
+      // getAerodromeTicks(allowedPools).catch((error: unknown) => {
       //   logger.error("❌ [Base/Aerodrome] Tick fetch failed:", error);
       //   return {};
       // })

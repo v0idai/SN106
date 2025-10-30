@@ -20,11 +20,12 @@ export interface PoolTickData {
  * Fetches current tick data from Uniswap V3 pools on Ethereum using multicall
  * Returns enhanced data with both tick and subnet_id
  */
-export async function getCurrentTickPerPool(): Promise<
+export async function getCurrentTickPerPool(allowedPools?: Set<string>): Promise<
   Record<string, PoolTickData>
 > {
   const startTime = Date.now();
   const tickData: Record<string, PoolTickData> = {};
+  const verbose = (process.env.LOG_VERBOSE_TICKS || '').toLowerCase() === 'true';
 
   try {
     const multicall = getMulticallInstance();
@@ -32,6 +33,18 @@ export async function getCurrentTickPerPool(): Promise<
 
     if (!sn106ContractAddress) {
       throw new Error('SN106 contract address not configured');
+    }
+
+    if (allowedPools) {
+      const size = allowedPools.size;
+      if (verbose) {
+        const sample = Array.from(allowedPools).slice(0, 5);
+        logger.info(`[Ethereum] 🔎 allowedPools size: ${size}; sample: ${JSON.stringify(sample)}`);
+      } else {
+        logger.info(`[Ethereum] 🔎 allowedPools size: ${size}`);
+      }
+    } else if (verbose) {
+      logger.info(`[Ethereum] 🔎 allowedPools not provided; fetching all ticks`);
     }
 
     // Get all supported pool addresses from the contract
@@ -83,8 +96,31 @@ export async function getCurrentTickPerPool(): Promise<
       throw new Error('Pool addresses and subnet IDs array length mismatch');
     }
 
-    const tickCalls = poolAddresses.map(poolAddress =>
-      createContractCall(poolAddress, POOL_ABI, 'slot0', [], { poolAddress }),
+    // Filter pools if allowedPools is provided
+    let filteredPoolData: Array<{ address: string; subnetId: number }> = [];
+    if (allowedPools && allowedPools.size > 0) {
+      for (let i = 0; i < poolAddresses.length; i++) {
+        const poolAddress = poolAddresses[i];
+        if (allowedPools.has(poolAddress)) {
+          filteredPoolData.push({ address: poolAddress, subnetId: subnetIds[i] });
+        } else if (verbose) {
+          logger.info(`[Ethereum] ⏭️ Skipping pool not in allowed set: ${poolAddress}`);
+        }
+      }
+      logger.info(`[Ethereum] 📋 Filtered to ${filteredPoolData.length} pools from ${poolAddresses.length} total`);
+    } else {
+      // No filtering - use all pools
+      filteredPoolData = poolAddresses.map((address, i) => ({ address, subnetId: subnetIds[i] }));
+      logger.info(`[Ethereum] 📋 Processing all ${filteredPoolData.length} pools`);
+    }
+
+    if (filteredPoolData.length === 0) {
+      logger.info('[Ethereum] ℹ️ No pools to fetch after filtering');
+      return {};
+    }
+
+    const tickCalls = filteredPoolData.map(pool =>
+      createContractCall(pool.address, POOL_ABI, 'slot0', [], { poolAddress: pool.address, subnetId: pool.subnetId }),
     );
 
     const tickResults = await multicall.executeBatch(
@@ -95,7 +131,7 @@ export async function getCurrentTickPerPool(): Promise<
     // Process tick results
     tickResults.forEach((result: any, idx: number) => {
       const poolAddress = tickCalls[idx].context.poolAddress;
-      const subnetId = subnetIds[idx];
+      const subnetId = tickCalls[idx].context.subnetId;
 
       try {
         const decoded = multicall.decodeResult(
@@ -128,6 +164,12 @@ export async function getCurrentTickPerPool(): Promise<
         );
       }
     });
+
+    const totalTime = Date.now() - startTime;
+    logger.info(`✅ [Ethereum/UniswapV3] Tick fetch complete:`);
+    logger.info(`  - Processed: ${filteredPoolData.length} pools`);
+    logger.info(`  - Found tick data: ${Object.keys(tickData).length} pools`);
+    logger.info(`  - Total time: ${totalTime}ms (${(totalTime/1000).toFixed(1)}s)`);
 
     return tickData;
   } catch (error) {
