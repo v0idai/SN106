@@ -150,6 +150,7 @@ export async function setWeightsOnSubtensor(
     console.log('UIDs:', uids);
     console.log('Scaled weights:', scaled);
     console.log('Scaled weights sum:', scaled.reduce((a, b) => a + b, 0), 'count:', scaled.length);
+    
     const burnUnits = scaled[uids.indexOf(0)];
     if (burnPercentage > 0) {
       console.log(`Burn UID 0 units: ${burnUnits} (~${((burnUnits / 65535) * 100).toFixed(4)}%), target: ${burnPercentage}%`);
