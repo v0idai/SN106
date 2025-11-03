@@ -8,7 +8,7 @@
 import { logger } from '../utils/logger';
 import { CONFIG } from '../config/environment';
 import { setWeightsOnSubtensor } from '../utils/setWeights';
-import { getHotkeyToUidMap, getSubnetAlphaPrices } from '../utils/bittensor';
+import { getHotkeyToUidMap } from '../utils/bittensor';
 import { calculatePoolWeightsWithReservedPools } from '../utils/poolWeights';
 import { getAllNFTPositions, getCurrentTickPerPool, listActivePools } from './chains';
 import { calculatePoolwiseNFTEmissions } from './calculations/emissions';
@@ -83,13 +83,7 @@ async function runValidator() {
     }
     const supportedSubnetIds = Object.keys(poolsBySubnet).map(x => Number(x));
 
-    // 3. Fetch alpha prices for all supported subnets
-    logger.info('Fetching subnet-alpha-price map from chain (all supported)...');
-    const [subnetAlphaPrices, err] = await getSubnetAlphaPrices(wsUrl, supportedSubnetIds);
-    if (err) {
-      logger.error('Failed to fetch subnet-alpha-price map:', err);
-    } 
-    logger.info(`Fetched ${Object.keys(subnetAlphaPrices).length} subnet alpha prices from chain`);
+    // 3. Skipping subnet alpha prices (not used in current allocation)
 
     // 4. Select relevant pools: subnet 0 and subnet 106 only
     const selectedPools = new Set<string>();
@@ -109,7 +103,7 @@ async function runValidator() {
     const { subnetWeights, poolWeights } = calculatePoolWeightsWithReservedPools(
       positions,
       currentTickPerPool,
-      subnetAlphaPrices,
+      {},
       filteredSubnetIds,
       0.85, // reserved share for subnet 0 pools
       0.15  // reserved share for subnet 106 pools
