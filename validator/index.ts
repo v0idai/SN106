@@ -8,7 +8,7 @@
 import { logger } from '../utils/logger';
 import { CONFIG } from '../config/environment';
 import { setWeightsOnSubtensor } from '../utils/setWeights';
-import { getHotkeyToUidMap, getSubnetAlphaPrices } from '../utils/bittensor';
+import { getHotkeyToUidMap } from '../utils/bittensor';
 import { calculatePoolWeightsWithReservedPools } from '../utils/poolWeights';
 import { getAllNFTPositions, getCurrentTickPerPool, listActivePools } from './chains';
 import { calculatePoolwiseNFTEmissions } from './calculations/emissions';
@@ -83,34 +83,12 @@ async function runValidator() {
     }
     const supportedSubnetIds = Object.keys(poolsBySubnet).map(x => Number(x));
 
-    // 3. Fetch alpha prices for all supported subnets
-    logger.info('Fetching subnet-alpha-price map from chain (all supported)...');
-    const [subnetAlphaPrices, err] = await getSubnetAlphaPrices(wsUrl, supportedSubnetIds);
-    if (err) {
-      logger.error('Failed to fetch subnet-alpha-price map:', err);
-    } 
-    logger.info(`Fetched ${Object.keys(subnetAlphaPrices).length} subnet alpha prices from chain`);
+    // 3. Skipping subnet alpha prices (not used in current allocation)
 
-    // 4. Select relevant pools: subnet 0, subnet 106, and top-10 pools by subnet alpha
+    // 4. Select relevant pools: subnet 0 and subnet 106 only
     const selectedPools = new Set<string>();
     for (const pool of (poolsBySubnet[0] || [])) selectedPools.add(pool);
     for (const pool of (poolsBySubnet[106] || [])) selectedPools.add(pool);
-
-    const subnetAlphaEntries = supportedSubnetIds
-      .filter(id => id !== 0 && id !== 106)
-      .map(id => ({ id, alpha: subnetAlphaPrices[id] || 0 }))
-      .sort((a, b) => b.alpha - a.alpha);
-    // rank pools by their subnet alpha; gather until 10 pools total after reserved
-    const topPoolCandidates: string[] = [];
-    for (const { id } of subnetAlphaEntries) {
-      const pools = poolsBySubnet[id] || [];
-      for (const pool of pools) {
-        topPoolCandidates.push(pool);
-        if (topPoolCandidates.length >= 10) break;
-      }
-      if (topPoolCandidates.length >= 10) break;
-    }
-    for (const pool of topPoolCandidates) selectedPools.add(pool);
 
     logger.info(`Selected ${selectedPools.size} pools for tick fetching`);
 
@@ -121,13 +99,13 @@ async function runValidator() {
     
     const filteredSubnetIds = [...new Set(Object.values(currentTickPerPool).map(p => p.subnetId))];
 
-    // 6. Build pool weights with new shares and top-10 policy
+    // 6. Build pool weights with updated shares (85% subnet 0, 15% subnet 106)
     const { subnetWeights, poolWeights } = calculatePoolWeightsWithReservedPools(
       positions,
       currentTickPerPool,
-      subnetAlphaPrices,
+      {},
       filteredSubnetIds,
-      0.15, // reserved share for non-subnet pools
+      0.85, // reserved share for subnet 0 pools
       0.15  // reserved share for subnet 106 pools
     );
 
@@ -136,9 +114,9 @@ async function runValidator() {
 
     // 7. Calculate per-NFT emissions pool-wise
     const nftEmissions = calculatePoolwiseNFTEmissions(positions, currentTickPerPool, poolWeights, 1.0);
+    
     logger.info('Per-NFT emissions (pool-wise):', nftEmissions);
     
-
     // 8. Aggregate per-miner emissions
     const minerWeightsRaw = nftEmissions.reduce<Record<string, number>>((acc, nft) => {
       acc[nft.miner] = (acc[nft.miner] || 0) + nft.emission;
