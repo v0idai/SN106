@@ -191,7 +191,27 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-// Scheduler: run every n minutes
-setInterval(runValidator, Number(CONFIG.VALIDATOR_INTERVAL_MINUTES) * 60 * 1000);
+/**
+ * Schedule the next validator run with a random interval between 10-30 minutes
+ */
+function scheduleNextRun(): void {
+  // Random interval between 10 and 30 minutes (in milliseconds)
+  const minMinutes = 10;
+  const maxMinutes = 30;
+  const randomMinutes = Math.floor(Math.random() * (maxMinutes - minMinutes + 1)) + minMinutes;
+  const intervalMs = randomMinutes * 60 * 1000;
+  
+  const nextRunDate = new Date(Date.now() + intervalMs);
+  logger.info(`Next validator run scheduled in ${randomMinutes} minutes (at ${nextRunDate.toISOString()})`);
+  
+  setTimeout(() => {
+    runValidator().finally(() => {
+      scheduleNextRun();
+    });
+  }, intervalMs);
+}
 
-runValidator();
+// Start the validator and schedule subsequent runs with random intervals
+runValidator().finally(() => {
+  scheduleNextRun();
+});
