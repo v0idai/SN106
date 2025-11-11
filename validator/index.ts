@@ -162,13 +162,13 @@ async function runValidator() {
       }
       logger.info('Submitting weights for in-range miners only; others set to 0.');
     } else {
-      // All out-of-range: do not update EMA; submission helper will fallback to uniform over all UIDs
-      logger.info('All staked NFTs are out-of-range. Submitting uniform weights across all UIDs.');
+      // All out-of-range: do not update EMA; submission helper will set all weights to zero
+      logger.info('All staked NFTs are out-of-range. Submitting zero weights for all UIDs.');
     }
 
     logger.info('Final miner weights (policy-applied):', minerWeights);
 
-    // 6. Submit weights to Subtensor chain (setWeights handles uniform fallback if empty)
+    // 6. Submit weights to Subtensor chain (setWeights will set all to zero if empty or if all weights are equal)
     logger.info('Submitting weights to Subtensor chain...');
     await setWeightsOnSubtensor(wsUrl, hotkeyUri, netuid, minerWeights, hotkeyToUid || {});
     logger.info('Validator run complete.');
