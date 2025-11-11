@@ -27,23 +27,34 @@ export async function setWeightsOnSubtensor(
 
     // Burn mechanism: we will apply this after establishing base miner weights
 
-    // Handle empty weights: fallback to uniform
+    // Handle empty weights: set all to zero (don't fallback to uniform)
     if (uids.length === 0) {
-      // Fallback: use all UIDs in addressToUid
+      // Use all UIDs in addressToUid but set all weights to zero
       uids = Object.values(addressToUid);
       if (uids.length === 0) {
         throw new Error('No UIDs available for weight submission.');
       }
-      const uniform = 1 / uids.length;
-      floatWeights = Array(uids.length).fill(uniform);
-      console.warn(`No miner weights found, using uniform weight ${uniform} for all ${uids.length} UIDs.`);
+      floatWeights = Array(uids.length).fill(0);
+      console.warn(`No miner weights found, setting all ${uids.length} UIDs to zero weight.`);
     }
 
-    // If all float weights zero/invalid, use uniform over selected UIDs 
+    // Check if all non-zero weights are equal (likely an error)
+    const nonZeroWeights = floatWeights.filter(w => w > 0);
+    if (nonZeroWeights.length > 0) {
+      const firstWeight = nonZeroWeights[0];
+      const allEqual = nonZeroWeights.every(w => Math.abs(w - firstWeight) < 1e-10);
+      if (allEqual) {
+        console.warn(`All non-zero weights are equal (${firstWeight}), likely an error. Setting all weights to zero.`);
+        floatWeights = Array(uids.length).fill(0);
+      }
+    }
+
+    // If all float weights zero/invalid, keep them at zero (don't use uniform)
     const sumFloat = floatWeights.reduce((a, b) => a + b, 0);
     if (!sumFloat || sumFloat <= 0 || !isFinite(sumFloat)) {
-      const uniform = 1 / uids.length;
-      floatWeights = Array(uids.length).fill(uniform);
+      // Keep all weights at zero instead of falling back to uniform
+      floatWeights = Array(uids.length).fill(0);
+      console.warn(`All weights are zero or invalid. Submitting zero weights for all ${uids.length} UIDs.`);
     }
     // Note: With burn mechanism disabled, all weight is allocated to miners (sum to 1.0)
 
@@ -64,12 +75,16 @@ export async function setWeightsOnSubtensor(
     const minersCount = minerIndices.length;
     const minerWeightsSum = minerIndices.reduce((acc, i) => acc + (isFinite(floatWeights[i]) && floatWeights[i] > 0 ? floatWeights[i] : 0), 0);
 
-    const desiredBurnInt = Math.round(burnProportion * 65535);
-    const minerTotalInt = 65535 - desiredBurnInt;
+    // If all weights are zero, submit all zeros (including burn UID)
+    const allWeightsZero = floatWeights.every(w => w === 0);
+    
+    const desiredBurnInt = allWeightsZero ? 0 : Math.round(burnProportion * 65535);
+    const minerTotalInt = allWeightsZero ? 0 : (65535 - desiredBurnInt);
 
     const minerFloatTargets: number[] = minerIndices.map(i => {
+      if (allWeightsZero) return 0;
       if (minerTotalInt <= 0) return 0;
-      if (minerWeightsSum <= 0 || !isFinite(minerWeightsSum)) return minerTotalInt / Math.max(minersCount, 1);
+      if (minerWeightsSum <= 0 || !isFinite(minerWeightsSum)) return 0; // Don't distribute if no valid weights
       return (floatWeights[i] / minerWeightsSum) * minerTotalInt;
     });
 
@@ -94,7 +109,12 @@ export async function setWeightsOnSubtensor(
     });
 
     let totalScaled = scaled.reduce((a, b) => a + b, 0);
-    if (totalScaled !== 65535) {
+    // If all weights are zero, skip distribution and keep all at zero
+    if (allWeightsZero) {
+      // All weights are intentionally zero, so totalScaled should be 0
+      // Don't distribute the remaining 65535
+      console.log('All weights are zero. Submitting zero weights for all UIDs (total: 0).');
+    } else if (totalScaled !== 65535) {
       let delta = 65535 - totalScaled; // positive => need to add, negative => need to remove
       if (delta > 0) {
         if (minersCount > 0) {

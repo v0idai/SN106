@@ -162,13 +162,13 @@ async function runValidator() {
       }
       logger.info('Submitting weights for in-range miners only; others set to 0.');
     } else {
-      // All out-of-range: do not update EMA; submission helper will fallback to uniform over all UIDs
-      logger.info('All staked NFTs are out-of-range. Submitting uniform weights across all UIDs.');
+      // All out-of-range: do not update EMA; submission helper will set all weights to zero
+      logger.info('All staked NFTs are out-of-range. Submitting zero weights for all UIDs.');
     }
 
     logger.info('Final miner weights (policy-applied):', minerWeights);
 
-    // 6. Submit weights to Subtensor chain (setWeights handles uniform fallback if empty)
+    // 6. Submit weights to Subtensor chain (setWeights will set all to zero if empty or if all weights are equal)
     logger.info('Submitting weights to Subtensor chain...');
     await setWeightsOnSubtensor(wsUrl, hotkeyUri, netuid, minerWeights, hotkeyToUid || {});
     logger.info('Validator run complete.');
@@ -191,7 +191,27 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-// Scheduler: run every n minutes
-setInterval(runValidator, Number(CONFIG.VALIDATOR_INTERVAL_MINUTES) * 60 * 1000);
+/**
+ * Schedule the next validator run with a random interval between 10-30 minutes
+ */
+function scheduleNextRun(): void {
+  // Random interval between 10 and 30 minutes (in milliseconds)
+  const minMinutes = 10;
+  const maxMinutes = 30;
+  const randomMinutes = Math.floor(Math.random() * (maxMinutes - minMinutes + 1)) + minMinutes;
+  const intervalMs = randomMinutes * 60 * 1000;
+  
+  const nextRunDate = new Date(Date.now() + intervalMs);
+  logger.info(`Next validator run scheduled in ${randomMinutes} minutes (at ${nextRunDate.toISOString()})`);
+  
+  setTimeout(() => {
+    runValidator().finally(() => {
+      scheduleNextRun();
+    });
+  }, intervalMs);
+}
 
-runValidator();
+// Start the validator and schedule subsequent runs with random intervals
+runValidator().finally(() => {
+  scheduleNextRun();
+});
