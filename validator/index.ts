@@ -85,10 +85,16 @@ async function runValidator() {
 
     // 3. Skipping subnet alpha prices (not used in current allocation)
 
-    // 4. Select relevant pools: subnet 0 and subnet 106 only
+    // 4. Select relevant pools: subnet 0 from both chains, subnet 106 from Ethereum only
     const selectedPools = new Set<string>();
+    // Subnet 0 pools from both Solana and Ethereum
     for (const pool of (poolsBySubnet[0] || [])) selectedPools.add(pool);
-    for (const pool of (poolsBySubnet[106] || [])) selectedPools.add(pool);
+    // Subnet 106 pools from Ethereum only (Solana subnet 106 gets zero weight)
+    for (const pool of (poolsBySubnet[106] || [])) {
+      if (pool.startsWith('ethereum:') || pool.startsWith('base:')) {
+        selectedPools.add(pool);
+      }
+    }
 
     logger.info(`Selected ${selectedPools.size} pools for tick fetching`);
 
@@ -99,14 +105,14 @@ async function runValidator() {
     
     const filteredSubnetIds = [...new Set(Object.values(currentTickPerPool).map(p => p.subnetId))];
 
-    // 6. Build pool weights with updated shares (85% subnet 0, 15% subnet 106)
+    // 6. Build pool weights: 90% subnet 0 (45% Solana, 45% Ethereum), 10% subnet 106 (Ethereum only)
     const { subnetWeights, poolWeights } = calculatePoolWeightsWithReservedPools(
       positions,
       currentTickPerPool,
       {},
       filteredSubnetIds,
-      0.85, // reserved share for subnet 0 pools
-      0.15  // reserved share for subnet 106 pools
+      0.90, // reserved share for subnet 0 pools (split equally between chains)
+      0.10  // reserved share for subnet 106 pools (Ethereum only)
     );
 
     logger.info('Subnet weights (raw alpha prices):', subnetWeights);
