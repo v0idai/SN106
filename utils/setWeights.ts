@@ -194,6 +194,64 @@ export async function setWeightsOnSubtensor(
 }
 
 /**
+ * Burn 100% of miner emissions by sending all weight to UID 0 (burn address)
+ */
+export async function burnAllWeightsOnSubtensor(
+  wsUrl: string,
+  hotkeyUri: string,
+  netuid: number,
+  addressToUid: Record<string, number>
+): Promise<void> {
+  try {
+    // Initialize the singleton client if needed
+    await subtensorClient.initialize(wsUrl);
+    const api = subtensorClient.getAPI();
+    
+    const keyring = new Keyring({ type: 'sr25519' });
+    const hotkey = keyring.addFromUri(hotkeyUri);
+
+    // Get all UIDs
+    const uids = Object.values(addressToUid);
+    if (uids.length === 0) {
+      throw new Error('No UIDs available for weight submission.');
+    }
+
+    // Ensure burn UID (0) exists
+    let burnIdx = uids.indexOf(0);
+    if (burnIdx === -1) {
+      uids.unshift(0);
+      burnIdx = 0;
+    }
+
+    // Allocate 100% to burn UID (65535 units)
+    const scaled: number[] = new Array(uids.length).fill(0);
+    scaled[burnIdx] = 65535;
+
+    // Get current block number as version key
+    const header = await api.rpc.chain.getHeader();
+    const versionKey = header.number.toNumber();
+
+    console.log('Burning 100% of weights (all to UID 0)...');
+    console.log('UIDs:', uids);
+    console.log('Scaled weights:', scaled);
+    console.log('Burn UID 0 units: 65535 (100%)');
+    console.log('Version key:', versionKey);
+
+    // Submit extrinsic
+    const tx = api.tx.subtensorModule.setWeights(netuid, uids, scaled, versionKey);
+    const hash = await tx.signAndSend(hotkey);
+    console.log('Weights burned with tx hash:', hash.toHex());
+    
+    // Save weight details to JSON file after successful transaction
+    await saveWeightDetails(uids, scaled, hash.toHex(), versionKey);
+    
+  } catch (err) {
+    console.error('Error burning weights:', err);
+    throw err;
+  }
+}
+
+/**
  * Save weight details to JSON file after successful transaction
  */
 async function saveWeightDetails(
