@@ -7,14 +7,17 @@
 // Entry point for the BitTensor Subnet Validator
 import { logger } from '../utils/logger';
 import { CONFIG } from '../config/environment';
-import { setWeightsOnSubtensor } from '../utils/setWeights';
+import { setWeightsOnSubtensor, burnAllWeightsOnSubtensor } from '../utils/setWeights';
 import { getHotkeyToUidMap } from '../utils/bittensor';
 import { calculatePoolWeightsWithReservedPools } from '../utils/poolWeights';
 import { getAllNFTPositions, getCurrentTickPerPool, listActivePools } from './chains';
 import { calculatePoolwiseNFTEmissions } from './calculations/emissions';
 import { subtensorClient } from './api';
 
-async function runValidator() {
+/**
+ * Original validator logic with emissions calculation (kept for reference)
+ */
+async function runValidatorWithEmissions() {
   logger.info('Starting validator run...');
   
   // Log enabled chains configuration
@@ -178,6 +181,38 @@ async function runValidator() {
   }
 }
 
+/**
+ * Main validator function: Burns 100% of emissions to UID 0
+ */
+async function runValidator() {
+  logger.info('Starting validator run (100% burn mode)...');
+  
+  try {
+    const wsUrl = CONFIG.SUBTENSOR.WS_URL;
+    const hotkeyUri = CONFIG.SUBTENSOR.HOTKEY_URI;
+    const netuid = CONFIG.SUBTENSOR.NETUID;
+
+    // Initialize the singleton API client once for this run
+    await subtensorClient.initialize(wsUrl);
+
+    // Get list of hotkeys to fetch UIDs
+    logger.info('Fetching hotkey-to-UID map from chain...');
+    const [hotkeyToUid, mapError] = await getHotkeyToUidMap(wsUrl, netuid);
+    if (mapError) {
+      logger.error('Failed to fetch hotkey-to-UID map:', mapError);
+    } 
+    logger.info(`Fetched ${Object.keys(hotkeyToUid).length} hotkeys from chain`);
+
+    // Burn 100% of weights to UID 0
+    logger.info('Burning 100% of emissions to UID 0...');
+    await burnAllWeightsOnSubtensor(wsUrl, hotkeyUri, netuid, hotkeyToUid || {});
+    logger.info('Validator run complete (100% burned).');
+
+  } catch (error) {
+    logger.error('Error in validator run:', error);
+  }
+}
+
 // Graceful shutdown handler
 process.on('SIGINT', async () => {
   logger.info('Received SIGINT, shutting down gracefully...');
@@ -192,17 +227,15 @@ process.on('SIGTERM', async () => {
 });
 
 /**
- * Schedule the next validator run with a random interval between 10-30 minutes
+ * Schedule the next validator run with a fixed interval of 40 minutes
  */
 function scheduleNextRun(): void {
-  // Random interval between 10 and 30 minutes (in milliseconds)
-  const minMinutes = 10;
-  const maxMinutes = 30;
-  const randomMinutes = Math.floor(Math.random() * (maxMinutes - minMinutes + 1)) + minMinutes;
-  const intervalMs = randomMinutes * 60 * 1000;
+  // Fixed interval of 40 minutes (in milliseconds)
+  const intervalMinutes = 40;
+  const intervalMs = intervalMinutes * 60 * 1000;
   
   const nextRunDate = new Date(Date.now() + intervalMs);
-  logger.info(`Next validator run scheduled in ${randomMinutes} minutes (at ${nextRunDate.toISOString()})`);
+  logger.info(`Next validator run scheduled in ${intervalMinutes} minutes (at ${nextRunDate.toISOString()})`);
   
   setTimeout(() => {
     runValidator().finally(() => {
@@ -211,7 +244,7 @@ function scheduleNextRun(): void {
   }, intervalMs);
 }
 
-// Start the validator and schedule subsequent runs with random intervals
+// Start the validator and schedule subsequent runs with fixed 40-minute intervals
 runValidator().finally(() => {
   scheduleNextRun();
 });
