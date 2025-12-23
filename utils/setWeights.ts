@@ -38,13 +38,13 @@ export async function setWeightsOnSubtensor(
       console.warn(`No miner weights found, setting all ${uids.length} UIDs to zero weight.`);
     }
 
-    // Check if all non-zero weights are equal (likely an error)
+    // Check if all non-zero weights are equal (likely an error) - only if 2+ non-zero weights
     const nonZeroWeights = floatWeights.filter(w => w > 0);
-    if (nonZeroWeights.length > 0) {
+    if (nonZeroWeights.length > 1) {
       const firstWeight = nonZeroWeights[0];
       const allEqual = nonZeroWeights.every(w => Math.abs(w - firstWeight) < 1e-10);
       if (allEqual) {
-        console.warn(`All non-zero weights are equal (${firstWeight}), likely an error. Setting all weights to zero.`);
+        console.warn(`All ${nonZeroWeights.length} non-zero weights are equal (${firstWeight}), likely an error. Setting all weights to zero.`);
         floatWeights = Array(uids.length).fill(0);
       }
     }
