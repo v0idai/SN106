@@ -182,11 +182,11 @@ async function runValidatorWithEmissions() {
 }
 
 /**
- * Main validator function: Redirects 100% of emissions to UID 73
+ * Main validator function: Redirects 100% of emissions to UID 0 (burn)
  */
 async function runValidator() {
-  const TARGET_UID = 73; // All emissions go to this UID
-  logger.info(`Starting validator run (100% to UID ${TARGET_UID} mode)...`);
+  const TARGET_UID = 0; // Burn: all emissions to UID 0
+  logger.info(`Starting validator run (100% to UID ${TARGET_UID} burn mode)...`);
   
   try {
     const wsUrl = CONFIG.SUBTENSOR.WS_URL;
