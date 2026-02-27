@@ -185,8 +185,7 @@ async function runValidatorWithEmissions() {
  * Main validator function: Redirects 100% of emissions to UID 0 (burn)
  */
 async function runValidator() {
-  const TARGET_UID = 0; // Burn: all emissions to UID 0
-  logger.info(`Starting validator run (100% to UID ${TARGET_UID} burn mode)...`);
+  logger.info('Starting validator run (100% burn mode)...');
   
   try {
     const wsUrl = CONFIG.SUBTENSOR.WS_URL;
@@ -204,23 +203,9 @@ async function runValidator() {
     } 
     logger.info(`Fetched ${Object.keys(hotkeyToUid).length} hotkeys from chain`);
 
-    // Find the hotkey for target UID
-    const targetHotkey = Object.entries(hotkeyToUid).find(([_, uid]) => uid === TARGET_UID)?.[0];
-    if (!targetHotkey) {
-      logger.error(`Target UID ${TARGET_UID} not found in hotkey map. Skipping weight submission.`);
-      return;
-    }
-
-    // Build weights: 100% to target UID, 0 to all others
-    const minerWeights: Record<string, number> = {};
-    for (const hotkey of Object.keys(hotkeyToUid)) {
-      minerWeights[hotkey] = 0;
-    }
-    minerWeights[targetHotkey] = 1.0; // 100% to target UID
-
-    logger.info(`Redirecting 100% of emissions to UID ${TARGET_UID} (hotkey: ${targetHotkey})...`);
-    await setWeightsOnSubtensor(wsUrl, hotkeyUri, netuid, minerWeights, hotkeyToUid || {});
-    logger.info(`Validator run complete (100% to UID ${TARGET_UID}).`);
+    logger.info('Burning 100% of emissions (all weight to UID 0)...');
+    await burnAllWeightsOnSubtensor(wsUrl, hotkeyUri, netuid, hotkeyToUid || {});
+    logger.info('Validator run complete (100% burn).');
 
   } catch (error) {
     logger.error('Error in validator run:', error);
