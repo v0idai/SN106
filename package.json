@@ -17,6 +17,7 @@
   "dependencies": {
     "@1inch/multicall": "^1.1.1",
     "@openzeppelin/contracts": "^5.4.0",
+    "@openzeppelin/contracts-upgradeable": "^5.4.0",
     "@polkadot/api": "^16.4.1",
     "@solana/web3.js": "^1.98.2",
     "axios": "^1.10.0",
@@ -29,9 +30,9 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^6.1.0",
     "@types/node": "^24.0.10",
+    "c8": "^9.1.0",
     "hardhat": "^2.26.2",
-    "hardhat-deploy": "^1.0.4",
-    "c8": "^9.1.0"
+    "hardhat-deploy": "^1.0.4"
   },
   "c8": {
     "include": [
